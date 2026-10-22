@@ -94,9 +94,42 @@ export function Notch() {
   const np = useNowPlaying();
   const live = useLiveActivity();
 
+  // --- [FITUR BARU] Pembersih Teks Cerdas untuk YouTube / Browser ---
+  const { cleanTitle, cleanArtist } = useMemo(() => {
+    if (!np?.title) return { cleanTitle: "", cleanArtist: "" };
+
+    let t = np.title;
+    let a = np.artist || "";
+
+    // 1. Buang embel-embel khas YouTube: (Official Video), [Lyrics], (Audio), dll.
+    t = t
+      .replace(
+        /[\[\(](official|lyric|audio|video|music|visualizer|hd|hq).*?[\]\)]/gi,
+        "",
+      )
+      .trim();
+
+    // 2. Jika judul mengandung " - " (Format YouTube: "Artis - Judul")
+    if (t.includes(" - ")) {
+      const parts = t.split(" - ");
+      // Deteksi jika artist yang dikirim OS malah nama browser
+      const isBrowser = /chrome|edge|brave|firefox|opera/i.test(a);
+
+      // Jika artis kosong, bernama browser, atau bertuliskan "YouTube", ambil artis dari judul!
+      if (!a || isBrowser || a === "YouTube") {
+        a = parts[0].trim();
+        t = parts.slice(1).join(" - ").trim();
+      }
+    }
+
+    return { cleanTitle: t, cleanArtist: a };
+  }, [np?.title, np?.artist]);
+  // ------------------------------------------------------------------
+
+  // Gunakan cleanTitle dan cleanArtist yang sudah dibersihkan ke LRCLIB
   const { lyrics, synced } = useSyncedLyrics(
-    np?.title,
-    np?.artist,
+    cleanTitle,
+    cleanArtist,
     np?.duration || (np as any)?.length,
   );
 
