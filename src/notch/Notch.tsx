@@ -333,7 +333,6 @@ interface LyricLine {
   text: string;
 }
 
-// Safety 1: Global Cache for preventing API Error / Double Fetch
 const lyricCache = new Map<string, Promise<LyricLine[]>>();
 
 function useSyncedLyrics(
@@ -345,7 +344,13 @@ function useSyncedLyrics(
   const [synced, setSynced] = useState(false);
 
   useEffect(() => {
-    if (!title || !artist) return (setLyrics([]), setSynced(false));
+    if (!title || !artist) {
+      setLyrics([]);
+      setSynced(false);
+      return;
+    }
+
+    let isCurrentSong = true;
 
     let secDuration = rawDuration || 0;
     if (secDuration > 1000) {
@@ -371,7 +376,6 @@ function useSyncedLyrics(
         let res = await fetch(`https://lrclib.net/api/get?${queryParams}`);
         let data = await res.json();
 
-        // Jika /get gagal karena selisih durasi > 2 detik, fallback cari manual lewat /search
         if (!res.ok || !data.syncedLyrics) {
           const searchRes = await fetch(
             `https://lrclib.net/api/search?${queryParams}`,
@@ -429,9 +433,15 @@ function useSyncedLyrics(
     }
 
     lyricCache.get(cacheKey)!.then((parsed) => {
-      setLyrics(parsed);
-      setSynced(parsed.length > 0);
+      if (isCurrentSong) {
+        setLyrics(parsed);
+        setSynced(parsed.length > 0);
+      }
     });
+
+    return () => {
+      isCurrentSong = false;
+    };
   }, [title, artist, rawDuration]);
 
   return { lyrics, synced };
